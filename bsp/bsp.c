@@ -3,6 +3,7 @@
 #include "stm32f4xx_gpio.h"		// Perifericos de E/S
 #include "stm32f4xx_rcc.h"		// Para configurar el (Reset and clock controller)
 #include "stm32f4xx_tim.h"		// Modulos Timers
+#include "stm32f4xx_adc.h"
 #include "stm32f4xx_exti.h"		// Controlador interrupciones externas
 #include "stm32f4xx_syscfg.h"	// configuraciones Generales
 #include "misc.h"				// Vectores de interrupciones (NVIC)
@@ -13,12 +14,24 @@
 #define LED_R GPIO_Pin_14
 #define LED_A GPIO_Pin_15
 
+#define LED_1 GPIO_Pin_11
+#define LED_2 GPIO_Pin_10
+#define LED_3 GPIO_Pin_7
+#define LED_4 GPIO_Pin_6
+#define LED_5 GPIO_Pin_3
+#define LED_6 GPIO_Pin_2
+#define LED_7 GPIO_Pin_1
+#define LED_8 GPIO_Pin_0
+
 #define BOTON GPIO_Pin_0
 
 /* Puertos de los leds disponibles */
-GPIO_TypeDef* leds_port[] = { GPIOD, GPIOD, GPIOD, GPIOD };
+GPIO_TypeDef* leds_port[] = { GPIOD, GPIOD, GPIOD, GPIOD, GPIOD, GPIOD, GPIOD,
+		GPIOD, GPIOD, GPIOD, GPIOD, GPIOD };
+
 /* Leds disponibles */
-const uint16_t leds[] = { LED_V, LED_R, LED_N, LED_A };
+const uint16_t leds[] = { LED_1, LED_2, LED_3,
+		LED_4, LED_5, LED_6, LED_7, LED_8,  LED_V, LED_R, LED_N, LED_A,};
 
 extern void APP_ISR_sw(void);
 extern void APP_ISR_1ms(void);
@@ -44,7 +57,8 @@ uint8_t sw_getState(void) {
 void bsp_delayMs(uint16_t x) {
 	bsp_contMS = x;
 
-	while(bsp_contMS);
+	while (bsp_contMS)
+		;
 
 }
 
@@ -57,7 +71,7 @@ void EXTI0_IRQHandler(void) {
 			{
 		EXTI_ClearFlag(EXTI_Line0); // Limpiamos la Interrupcion
 		// Rutina:
-		APP_ISR_sw();
+		//APP_ISR_sw();
 	}
 }
 
@@ -69,9 +83,9 @@ void TIM2_IRQHandler(void) {
 	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET) {
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 
-		APP_ISR_1ms();
+		//APP_ISR_1ms();
 
-		if (bsp_contMS){
+		if (bsp_contMS) {
 			bsp_contMS--;
 		}
 	}
@@ -80,11 +94,13 @@ void TIM2_IRQHandler(void) {
 void bsp_led_init();
 void bsp_sw_init();
 void bsp_timer_config();
+void InitAdc();
 
 void bsp_init() {
 	bsp_led_init();
 	bsp_sw_init();
 	bsp_timer_config();
+	InitAdc();
 
 }
 
@@ -99,6 +115,11 @@ void bsp_led_init() {
 
 	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_15 | GPIO_Pin_14;
 	GPIO_InitStruct.GPIO_Pin |= GPIO_Pin_13 | GPIO_Pin_12;
+	GPIO_InitStruct.GPIO_Pin |= GPIO_Pin_0 | GPIO_Pin_1;
+	GPIO_InitStruct.GPIO_Pin |= GPIO_Pin_2 | GPIO_Pin_3;
+	GPIO_InitStruct.GPIO_Pin |= GPIO_Pin_6 | GPIO_Pin_7;
+	GPIO_InitStruct.GPIO_Pin |= GPIO_Pin_10 | GPIO_Pin_11;
+
 
 	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
@@ -172,3 +193,46 @@ void bsp_timer_config(void) {
 	TIM_Cmd(TIM2, ENABLE);
 
 }
+
+void InitAdc() {
+	// Config structs
+	GPIO_InitTypeDef GPIO_InitStruct;
+	ADC_CommonInitTypeDef ADC_CommonInitStruct;
+	ADC_InitTypeDef ADC1_InitStruct;
+// Enable the clock for ADC and the ADC GPIOs
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+// Configure these ADC pins in analog mode using GPIO_Init();
+	GPIO_StructInit(&GPIO_InitStruct); // Reset gpio init structure
+	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_2;
+	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AIN; // Obvezno AIN !!!
+	GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+// Common ADC init sets the prescaler
+	ADC_CommonStructInit(&ADC_CommonInitStruct);
+	ADC_CommonInitStruct.ADC_Prescaler = ADC_Prescaler_Div4;
+	ADC_CommonInit(&ADC_CommonInitStruct);
+	/* ADC1 Configuration */
+	ADC_StructInit(&ADC1_InitStruct);
+	ADC1_InitStruct.ADC_Resolution = ADC_Resolution_12b;
+	ADC_Init(ADC1, &ADC1_InitStruct);
+	ADC_Cmd(ADC1, ENABLE);
+	/* Now do the setup */
+	ADC_Init(ADC1, &ADC1_InitStruct);
+	/* Enable ADC1 */
+	ADC_Cmd(ADC1, ENABLE);
+}
+
+uint16_t readADC1() {
+	ADC_RegularChannelConfig(ADC1, 12, 1, ADC_SampleTime_15Cycles);
+	ADC_SoftwareStartConv(ADC1);
+	while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) != SET)
+		;
+	return ADC_GetConversionValue(ADC1);
+}
+
+float calculoPote(uint16_t pote) {
+	return (float) pote / 40.96;
+}
+

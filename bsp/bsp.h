@@ -37,4 +37,8 @@ void bsp_init();
  */
 void bsp_delayMs(uint16_t x);
 
+uint16_t readADC1();
+
+float calculoPote(uint16_t pote);
+
 #endif

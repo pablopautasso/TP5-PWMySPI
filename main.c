@@ -1,4 +1,5 @@
 #include <stdint.h>
+
 #include "bsp/bsp.h"
 
 /**
@@ -9,6 +10,10 @@
  */
 void ledPulso(uint8_t led, uint32_t tiempo);
 
+float porcentaje = 0;
+int i=0;
+
+uint8_t leds[8];
 /**
  * @brief Aplicacion principal
  */
@@ -16,34 +21,30 @@ int main(void) {
 	bsp_init();
 
 	while (1) {
+		porcentaje = calculoPote(readADC1());
 
+		/*if (porcentaje <= 12.5) {
+		 led_on(0);
+		 }else
+		 led_off(0);*/
+		for ( i = 0; i < 8; i++){
+			if (porcentaje <= 12.5*(i+1)) {
+				led_on(i);
+			}else
+			{
+				led_off(i);
+			}
 	}
+}
 }
 
 /**
  * @brief Se preciono el pulsador
  *
  */
-void APP_ISR_sw(void){
-
-}
 
 /**
  * @brief Interrupcion cada 1ms
  *
  */
-void APP_ISR_1ms(void){
-	static uint16_t count_1s = 1000;
-	count_1s--;
-	if (!count_1s) {
-		led_toggle(0);
-		count_1s = 1000;
-	}
-}
 
-
-void ledPulso(uint8_t led, uint32_t tiempo){
-	led_on(led);
-	Delay(tiempo);
-	led_off(led);
-}
